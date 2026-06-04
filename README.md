@@ -2,16 +2,20 @@
 
 Export Wix blogs to WordPress automatically using Wix Velo code.
 
-### Features
+---
 
-* Post title
-* Slug
-* Excerpt
-* Publish date
-* Rich text content (all formatting, paragraphs, and headings preserved in proper sequence)
-* Images (using Wix image URLs that WordPress can automatically import into the Media Library)
-* Categories
-* Internal links inside content
+## Features
+
+- Post title
+- Slug
+- Excerpt
+- Publish date
+- Rich text content (formatting preserved: headings, paragraphs, lists, links)
+- Images (Wix CDN URLs compatible with WordPress import)
+- Categories
+- Internal links
+
+---
 
 ## Setup
 
@@ -19,46 +23,148 @@ Export Wix blogs to WordPress automatically using Wix Velo code.
 
 In your Wix Editor, enable **Developer Mode (Velo)**.
 
-Open any page (the Home page works fine) and paste the frontend code provided in this repository into the page's code file.
+Open any page (Home page is fine) and paste the frontend exporter code into that page's code file.
 
-### Step 2: Create the Backend File
+---
 
-Click the **{ } Code Files** icon in the left sidebar.
+### Step 2: Create Backend File
 
-Under **Backend**, create a new file named:
+Go to:
 
-`exportblog.web.js`
+**{ } Code Files → Backend**
 
-Paste the backend code from this repository into that file and save.
+Create a file:
 
-### Step 3: Generate the Export
+```
+exportblog.web.js
+```
 
-Preview or run the site.
+Paste your backend blog export logic there and save.
 
-The script will generate a complete WordPress WXR (XML) export and print it to the browser console.
+---
 
-Copy everything printed in the console and save it as:
+## ⚙️ Configuration
 
-`wix-blog-export.xml`
+### 1. Category Mapping (IMPORTANT)
 
-### Step 4: Import into WordPress
+Wix uses category IDs (UUIDs), not names.
 
-In your WordPress dashboard:
+Inside your code:
 
-**Tools → Import → WordPress**
+```js
+const CATEGORY_MAP = {
+  "wix-category-id": "Technology",
+  "another-category-id": "News"
+};
+```
 
-Install the WordPress Importer if prompted, then upload the generated XML file.
+**How to get category IDs in Wix:**
 
-WordPress will import all supported blog data contained in the export file.
+1. Go to Wix Dashboard
+2. Open **Blog → Categories**
+3. Click a category
+4. Copy its ID (looks like a UUID)
 
-### WordPress Import Tutorial
+Example:
 
-A good official guide is available here:
+```
+0dc3f4f3-74f5-4534-87d1-f010a53294a3
+```
 
-https://wordpress.org/documentation/article/tools-import-screen/
+If not mapped, the category becomes:
 
-Or the detailed importer guide:
+```
+Uncategorized-xxxxxxx
+```
 
-https://wordpress.org/documentation/article/importing-content/
+---
 
-That's it — no external migration service required.
+### 2. Getting Blog Posts (Wix Entries)
+
+Your exporter uses:
+
+```
+getAllBlogPosts()
+```
+
+This must return Wix blog post objects containing:
+
+- `title`
+- `slug`
+- `excerpt`
+- `richContent`
+- `categoryIds`
+- `media`
+- `publishedDate`
+
+This function lives in:
+
+```
+backend/exportblog.web.js
+```
+
+---
+
+### 3. Site Name + Domain (REQUIRED)
+
+You must set your Wix site URL manually:
+
+```js
+buildWordPressXml(posts, siteUrl, siteTitle)
+```
+
+Example:
+
+```js
+const xml = buildWordPressXml(
+  data,
+  "https://yourdomain.com",
+  "My Blog"
+);
+```
+
+**How to find your Wix domain:**
+
+- Go to **Wix Dashboard → Settings → Domains**
+- Or use the default: `https://username.wixsite.com/sitename`
+- If a custom domain exists, use that instead
+
+---
+
+## 🚀 Generate Export
+
+1. Run your Wix site in **Preview** or **Live** mode
+2. Open browser **DevTools** (`F12`)
+3. Go to the **Console** tab
+4. Copy the full XML output
+5. Save it as:
+
+```
+wix-blog-export.xml
+```
+
+---
+
+## 📥 Import into WordPress
+
+Go to:
+
+**WordPress Dashboard → Tools → Import → WordPress**
+
+- Install the importer if prompted
+- Upload the XML file
+- Run the import
+
+WordPress will import:
+
+- Posts
+- Categories
+- Images (via URLs)
+- Content formatting
+
+---
+
+## 📚 WordPress Docs
+
+- https://wordpress.org/documentation/article/tools-import-screen/
+- https://wordpress.org/documentation/article/importing-content/
