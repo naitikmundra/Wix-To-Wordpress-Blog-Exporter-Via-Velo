@@ -42,6 +42,7 @@ exportblog.web.js
 Paste your backend blog export logic there and save.
 
 Change post limit according to your number of posts (default 200)
+
 ---
 
 ## ⚙️ Configuration
