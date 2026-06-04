@@ -1,5 +1,7 @@
 // backend/getAllBlogPosts.web.js
 // An Exporter by Naitik Mundra
+
+//CHANGE .limit(200) to the number of posts
 import { Permissions, webMethod } from "wix-web-module";
 import { posts } from "wix-blog-backend";
 
@@ -23,7 +25,7 @@ export const getAllBlogPosts = webMethod(
     async () => {
         try {
             const result = await posts.queryPosts()
-                .limit(2)
+                .limit(200)
                 .find();
 
             const formatted = await Promise.all(
