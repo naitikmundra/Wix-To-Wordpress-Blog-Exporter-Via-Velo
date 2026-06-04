@@ -1,4 +1,4 @@
-# Wix-To-Wordpress-Blog-Exporter-Via-Velo
+# Wix To Wordpress Blog Exporter Via Velo
 
 Export Wix blogs to wordpress using Wix velo code automatically
 - Post title
