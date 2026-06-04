@@ -9,7 +9,7 @@ import { getAllBlogPosts } from 'backend/exportblog.web';
 // ─── Category ID → Label map ─────────────────────────────────
 // Add all your category IDs here
 const CATEGORY_MAP = {
-  "0dc3f4f3-74f5-sampleid3": "Category Name 1",
+  "0dc3f4f3-74f5-4534-87d1-f010a53294a3": "Category Name 1",
   "sample category ID": "Category Name 2",
   // Add more: "uuid-here": "Category Name",
 };
@@ -42,6 +42,10 @@ function wixImageUrl(mediaId) {
   if (!mediaId) return "";
   // Fix backslash escaping in media IDs (e.g. f778f5\_abc~mv2.jpg → f778f5_abc~mv2.jpg)
   mediaId = unescapeStr(mediaId);
+  // Strip ALL quotes, backticks, and whitespace — Wix sometimes embeds a leading " in the ID
+  // which causes WordPress to treat the URL as relative and prepend the site URL to it
+  mediaId = mediaId.replace(/["'`\s]/g, "");
+  if (!mediaId) return "";
   // Handle wix:image://v1/FILE_ID/FILENAME#... format
   if (mediaId.startsWith("wix:image://")) {
     const withoutPrefix = mediaId.replace("wix:image://v1/", "");
