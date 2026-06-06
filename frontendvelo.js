@@ -15,11 +15,16 @@ const CATEGORY_MAP = {
 };
 
 // ─── Fix backslash-escaped characters from Wix/JSON ──────────
+// NOTE: The double-backslash replacement MUST come last to avoid
+//       interfering with the other pattern replacements above it.
 function unescapeStr(str = "") {
   return String(str)
-    .replace(/\\_/g, "_")
-    .replace(/\\\//g, "/")
-    .replace(/\\~/g, "~");
+    .replace(/\\_/g,   "_")
+    .replace(/\\\//g,  "/")
+    .replace(/\\~/g,   "~")
+    .replace(/\\n/g,   "\n")   // literal \n sequences left by Wix
+    .replace(/\\t/g,   "\t")   // literal \t sequences left by Wix
+    .replace(/\\\\/g,  "\\");  // double-escaped backslashes — MUST be last
 }
 
 // ─── Strip accidental base-URL prefix from a URL ─────────────
@@ -59,10 +64,10 @@ function wixImageUrl(mediaId) {
 // ─── Escape XML attribute values ─────────────────────────────
 function xmlAttr(str = "") {
   return String(str)
-    .replace(/&/g, "&amp;")
-    .replace(/"/g, "&quot;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+    .replace(/&/g,  "&amp;")
+    .replace(/"/g,  "&quot;")
+    .replace(/</g,  "&lt;")
+    .replace(/>/g,  "&gt;");
 }
 
 // ─── Escape plain text inside HTML (not CDATA) ───────────────
@@ -89,14 +94,16 @@ function renderTextNodes(nodes = [], baseUrl) {
     }
     if (child.type !== "TEXT") return "";
 
-    let text = escHtml(child.textData?.text || "");
+    // FIX: unescape Wix backslash sequences BEFORE HTML-escaping,
+    // otherwise \_  \/ \~ etc. survive into the output XML.
+    let text = escHtml(unescapeStr(child.textData?.text || ""));
     if (!text.trim()) return text;
 
     const decs = child.textData?.decorations || [];
 
     const linkDec = decs.find(d => d.type === "LINK");
     if (linkDec) {
-      const href = xmlAttr(resolveUrl(linkDec.linkData?.link?.url, baseUrl));
+      const href   = xmlAttr(resolveUrl(linkDec.linkData?.link?.url, baseUrl));
       const target = linkDec.linkData?.link?.target === "BLANK"
         ? ` target="_blank" rel="noreferrer noopener"`
         : "";
@@ -134,7 +141,7 @@ function richContentToHtml(nodes = [], baseUrl = "https://yoursite.com") {
       const url   = wixImageUrl(srcId);
       const w     = node.imageData?.image?.width  || "";
       const h     = node.imageData?.image?.height || "";
-      const alt   = (node.imageData?.altText || "").replace(/"/g, "'"); // safe for HTML attr
+      const alt   = unescapeStr(node.imageData?.altText || "").replace(/"/g, "'"); // FIX: unescape alt text
       const align = node.imageData?.containerData?.alignment || "CENTER";
       const style = align === "CENTER" ? ` style="display:block;margin:0 auto;"` : "";
       parts.push(`<img src="${url}" width="${w}" height="${h}" alt="${alt}"${style} />`);
@@ -148,7 +155,7 @@ function richContentToHtml(nodes = [], baseUrl = "https://yoursite.com") {
       const thumbUrl     = cleanUrl(node.videoData?.thumbnail?.src?.url || "");
       const thumbId      = node.videoData?.thumbnail?.src?._id || "";
       const posterUrl    = thumbUrl || (thumbId ? wixImageUrl(thumbId) : "");
-      const title        = (node.videoData?.title || "").replace(/"/g, "'");
+      const title        = unescapeStr(node.videoData?.title || "").replace(/"/g, "'"); // FIX: unescape title
       const captionNode  = (node.nodes || []).find(n => n.type === "CAPTION");
       const captionText  = captionNode ? renderTextNodes(captionNode.nodes || [], baseUrl) : "";
 
@@ -235,6 +242,8 @@ function richContentToHtml(nodes = [], baseUrl = "https://yoursite.com") {
 
     // GIPHY
     if (node.type === "GIPHY") {
+      // FIX: cleanUrl already calls unescapeStr, but the gif URLs may also need
+      // the double-backslash pass — cleanUrl handles that now via updated unescapeStr
       const url = cleanUrl(node.giphyData?.gif?.originalUrl || node.giphyData?.gif?.stillUrl || "");
       if (url) parts.push(`<img src="${url}" alt="gif" />`);
       continue;
@@ -246,7 +255,7 @@ function richContentToHtml(nodes = [], baseUrl = "https://yoursite.com") {
       const imgs = items.map(item => {
         const id  = item.image?.media?.src?._id || "";
         const url = id ? wixImageUrl(id) : cleanUrl(item.image?.media?.src?.url || "");
-        const alt = (item.title || "").replace(/"/g, "'");
+        const alt = unescapeStr(item.title || "").replace(/"/g, "'"); // FIX: unescape gallery item titles
         return url ? `<img src="${url}" alt="${alt}" />` : "";
       }).filter(Boolean).join("\n");
       if (imgs) parts.push(`<figure class="wp-block-gallery">\n${imgs}\n</figure>`);
@@ -294,9 +303,9 @@ function buildWordPressXml(posts, siteUrl = "https://yoursite.com", siteTitle = 
 
   const items = posts.map((post, postIndex) => {
     const html       = post.html || {};
-    const title      = html.title  || post.title  || "Untitled";
+    const title      = unescapeStr(html.title  || post.title  || "Untitled"); // FIX: unescape title
     const slug       = unescapeStr(html.slug   || post.slug   || "");
-    const excerpt    = html.excerpt || post.excerpt || "";
+    const excerpt    = unescapeStr(html.excerpt || post.excerpt || "");        // FIX: unescape excerpt
     const pubDate    = html.firstPublishedDate || post.publishedDate || new Date().toISOString();
     const modDate    = html.lastPublishedDate  || pubDate;
     const postId     = html._id || post.id || `post-${postIndex + 1}`;
@@ -319,8 +328,8 @@ function buildWordPressXml(posts, siteUrl = "https://yoursite.com", siteTitle = 
 
     // Tags/hashtags
     const hashtagTags = (html.hashtags || []).map(tag => {
-      const tagSlug = tag.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
-      return `    <category domain="post_tag" nicename="${tagSlug}"><![CDATA[${tag}]]></category>`;
+      const tagSlug = unescapeStr(tag).toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, ""); // FIX: unescape hashtags
+      return `    <category domain="post_tag" nicename="${tagSlug}"><![CDATA[${unescapeStr(tag)}]]></category>`;
     }).join("\n");
 
     return `
